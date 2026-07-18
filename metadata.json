@@ -1,0 +1,8 @@
+{
+  "name": "Kalkulator Optymalizacji PC",
+  "description": "Kalkulator doboru komponentów gamingowych PC na podstawie autorskiego algorytmu (System Punktowy) z pracy dyplomowej.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
