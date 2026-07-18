@@ -3,7 +3,6 @@ import { GPUS, CPUS, MOTHERBOARDS, RAMS, RECOMMENDED_BUILDS } from '../data';
 import { CalculationResult, HistoryItem, RecommendedBuild } from '../types';
 import { Zap, AlertTriangle, Monitor, Cpu, MemoryStick, DollarSign, Database, History, FileDown, Trash2, Power, Gamepad2, Star, Activity } from 'lucide-react';
 import { useI18n } from '../i18n';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
@@ -164,25 +163,165 @@ export default function Calculator() {
   };
 
   const exportPDF = async () => {
-    const el = document.getElementById('calc-results');
-    if (!el) return;
     try {
       setIsExporting(true);
-      const canvas = await html2canvas(el, { 
-        backgroundColor: '#0F0F12', 
-        scale: 2,
-        useCORS: true,
-        logging: false
-      });
-      const imgData = canvas.toDataURL('image/png');
+      
+      const removePl = (text: string) => {
+        return text.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, match => {
+          const map: Record<string, string> = {
+            'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+            'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'
+          };
+          return map[match] || match;
+        });
+      };
+
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      
+      // Background
+      pdf.setFillColor(15, 15, 18);
+      pdf.rect(0, 0, 210, 297, 'F');
+      
+      // Header
+      pdf.setTextColor(224, 224, 230);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(24);
+      pdf.text('CalcPro | PC Optimizer', 20, 30);
+      
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(lang === 'pl' ? removePl('Raport Wydajności') : 'Performance Analysis Report', 20, 40);
+
+      // Separator
+      pdf.setDrawColor(42, 42, 48);
+      pdf.line(20, 48, pageWidth - 20, 48);
+
+      // Score Box
+      pdf.setFillColor(26, 26, 32);
+      pdf.roundedRect(20, 55, pageWidth - 40, 40, 3, 3, 'F');
+      
+      pdf.setFontSize(12);
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(lang === 'pl' ? removePl('WYNIK PUNKTOWY (WZ)') : 'PERFORMANCE SCORE (WZ)', 30, 68);
+      
+      pdf.setFontSize(36);
+      pdf.setTextColor(224, 224, 230);
+      pdf.setFont('helvetica', 'bold');
+      const scoreStr = String(result.totalScore);
+      pdf.text(scoreStr, 30, 85);
+      const scoreWidth = pdf.getTextWidth(scoreStr);
+      
+      pdf.setFontSize(16);
+      pdf.setTextColor(128, 128, 143);
+      pdf.text('pkt', 30 + scoreWidth + 2, 85);
+
+      // Tier & OE
+      let tierColor = [224, 224, 230];
+      if (result.tier === 'S') tierColor = [168, 85, 247]; 
+      else if (result.tier === 'A') tierColor = [59, 130, 246];
+      else if (result.tier === 'B') tierColor = [34, 197, 94];
+      else if (result.tier === 'C') tierColor = [234, 179, 8];
+      else if (result.tier === 'D') tierColor = [249, 115, 22];
+      else if (result.tier === 'Legacy') tierColor = [239, 68, 68];
+
+      pdf.setTextColor(tierColor[0], tierColor[1], tierColor[2]);
+      pdf.setFontSize(24);
+      pdf.text(`Tier ${result.tier}`, pageWidth - 30, 72, { align: 'right' });
+      
+      pdf.setFontSize(12);
+      const oeLabel = lang === 'pl' ? removePl('Opłacalność (OE): ') : 'Value (OE): ';
+      const oeVal = `${Number(result.oe).toFixed(2)} pkt/PLN`;
+      
+      pdf.setTextColor(34, 197, 94);
+      pdf.text(oeVal, pageWidth - 30, 85, { align: 'right' });
+      
+      const oeValWidth = pdf.getTextWidth(oeVal);
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(oeLabel, pageWidth - 30 - oeValWidth - 2, 85, { align: 'right' });
+
+      // Components Section
+      const startY = 110;
+      pdf.setFontSize(18);
+      pdf.setTextColor(224, 224, 230);
+      pdf.text(lang === 'pl' ? removePl('Wybrane Komponenty') : 'Selected Components', 20, startY);
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      
+      const g = GPUS.find(x => x.id === selectedGpu);
+      const c = CPUS.find(x => x.id === selectedCpu);
+      const m = MOTHERBOARDS.find(x => x.id === selectedMb);
+      const r = RAMS.find(x => x.id === selectedRam);
+
+      const comps = [
+        { label: 'GPU', name: g?.name, price: gpuPrice },
+        { label: 'CPU', name: c?.name, price: cpuPrice },
+        { label: 'RAM', name: r?.name, price: ramPrice },
+        { label: 'MB', name: m?.name, price: mbPrice },
+      ];
+
+      let curY = startY + 12;
+      comps.forEach(comp => {
+        pdf.setTextColor(128, 128, 143);
+        pdf.text(comp.label, 20, curY);
+        pdf.setTextColor(224, 224, 230);
+        pdf.text(comp.name || '', 40, curY);
+        pdf.setTextColor(128, 128, 143);
+        pdf.text(`${comp.price} PLN`, pageWidth - 20, curY, { align: 'right' });
+        curY += 12;
+      });
+
+      // Total Price
+      pdf.setDrawColor(42, 42, 48);
+      pdf.line(20, curY, pageWidth - 20, curY);
+      curY += 12;
+
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(224, 224, 230);
+      pdf.text(lang === 'pl' ? removePl('Całkowity Koszt') : 'Total Price', 20, curY);
+      pdf.text(`${result.totalPrice} PLN`, pageWidth - 20, curY, { align: 'right' });
+      
+      curY += 25;
+
+      // System Details
+      pdf.setFontSize(18);
+      pdf.text(lang === 'pl' ? removePl('Szczegóły Systemu') : 'System Details', 20, curY);
+
+      curY += 12;
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+
+      // Power & Bottleneck
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(lang === 'pl' ? removePl('Pobór mocy:') : 'Power Draw:', 20, curY);
+      pdf.setTextColor(224, 224, 230);
+      pdf.text(`${result.powerW}W`, 65, curY);
+
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(lang === 'pl' ? removePl('Zalecany zasilacz:') : 'Recommended PSU:', pageWidth - 80, curY);
+      pdf.setTextColor(224, 224, 230);
+      pdf.text(`${result.recommendedPsuW}W`, pageWidth - 20, curY, { align: 'right' });
+
+      curY += 12;
+
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(lang === 'pl' ? removePl('Wąskie gardło:') : 'Bottleneck:', 20, curY);
+      pdf.setTextColor(224, 224, 230);
+      const bneckText = result.bottleneckStatus !== 'Balanced' ? `${removePl(result.bottleneckStatus)} (${result.bottleneckPercent}%)` : (lang === 'pl' ? 'Brak' : 'None');
+      pdf.text(bneckText, 65, curY);
+
+      // Footer
+      pdf.setFontSize(10);
+      pdf.setTextColor(128, 128, 143);
+      pdf.text(`Generated by CalcPro | ${new Date().toLocaleDateString()}`, pageWidth / 2, 285, { align: 'center' });
+
       pdf.save(`CalcPro_Result_${result.totalScore}pts.pdf`);
     } catch (error) {
       console.error('Failed to export PDF:', error);
-      alert('Nie udało się wyeksportować pliku PDF. / Failed to export PDF.');
+      alert(lang === 'pl' ? 'Nie udało się wyeksportować pliku PDF.' : 'Failed to export PDF.');
     } finally {
       setIsExporting(false);
     }
