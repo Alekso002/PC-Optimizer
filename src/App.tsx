@@ -18,6 +18,10 @@ function MainApp() {
             <span className="font-semibold tracking-tight text-lg text-[#E0E0E6]">{t.appTitle}</span>
           </div>
           <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-1.5 bg-[#2A2A30] px-3 py-1.5 rounded-md border border-[#3A3A42] text-sm text-[#80808F]">
+              <Settings className="w-4 h-4" />
+              {t.headerTag}
+            </div>
             <button 
               onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}
               className="flex items-center gap-2 hover:text-white text-[#80808F] transition-colors bg-[#1A1A20] px-3 py-1.5 rounded-md border border-[#2A2A30]"

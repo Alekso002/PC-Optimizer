@@ -8,7 +8,7 @@ import jsPDF from 'jspdf';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
 export default function Calculator() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   const [selectedGpu, setSelectedGpu] = useState(GPUS[0].id);
   const [selectedCpu, setSelectedCpu] = useState(CPUS[0].id);
@@ -22,6 +22,7 @@ export default function Calculator() {
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'history' | 'recommended'>('history');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('calcpro_history');
@@ -165,13 +166,26 @@ export default function Calculator() {
   const exportPDF = async () => {
     const el = document.getElementById('calc-results');
     if (!el) return;
-    const canvas = await html2canvas(el, { backgroundColor: '#0F0F12', scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`CalcPro_Result_${result.totalScore}pts.pdf`);
+    try {
+      setIsExporting(true);
+      const canvas = await html2canvas(el, { 
+        backgroundColor: '#0F0F12', 
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`CalcPro_Result_${result.totalScore}pts.pdf`);
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      alert('Nie udało się wyeksportować pliku PDF. / Failed to export PDF.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const tierColors = {
@@ -378,10 +392,11 @@ export default function Calculator() {
           </button>
           <button 
             onClick={exportPDF}
-            className="flex-1 bg-[#2A2A30] hover:bg-[#3A3A42] text-[#E0E0E6] font-medium py-2.5 rounded-xl transition-colors flex justify-center items-center gap-2"
+            disabled={isExporting}
+            className="flex-1 bg-[#2A2A30] hover:bg-[#3A3A42] disabled:opacity-50 disabled:cursor-not-allowed text-[#E0E0E6] font-medium py-2.5 rounded-xl transition-colors flex justify-center items-center gap-2"
           >
-            <FileDown className="w-4 h-4" />
-            {t.exportPdfBtn}
+            {isExporting ? <Activity className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            {isExporting ? (lang === 'pl' ? 'Eksportowanie...' : 'Exporting...') : t.exportPdfBtn}
           </button>
         </div>
 
